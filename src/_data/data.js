@@ -23,6 +23,15 @@ const EDIT_ON_GITHUB_ROOT = "https://github.com/orcwg/cra-hub/edit/main/"
 const mdPlain = markdownIt().use(plainTextPlugin);
 
 // ============================================================================
+// Utility Functions - Path and URL
+// ============================================================================
+
+// Generate edit-on-GitHub URL for a file relative to CACHE_DIR
+function getEditOnGithubUrl(relativePath) {
+  return new URL(relativePath, EDIT_ON_GITHUB_ROOT).href;
+}
+
+// ============================================================================
 // Utility Functions - Text Processing
 // ============================================================================
 
@@ -102,12 +111,15 @@ function parseMarkdownFiles(files) {
     const fullPath = path.join(file.parentPath, file.name);
     const rawFile = fs.readFileSync(fullPath, "utf-8");
     const parsed = matter(rawFile);
+    const relativePath = path.relative(CACHE_DIR, fullPath);
 
     return {
       filename: file.name,
       path: path.relative(CACHE_DIR, file.parentPath),
       data: parsed.data,
-      content: parsed.content.trim()
+      content: parsed.content.trim(),
+      editOnGithubUrl: getEditOnGithubUrl(relativePath),
+
     };
   });
 
@@ -120,11 +132,13 @@ function parseYamlFiles(files) {
     const fullPath = path.join(file.parentPath, file.name);
     const rawFile = fs.readFileSync(fullPath, "utf-8");
     const parsedYaml = yaml.load(rawFile);
+    const relativePath = path.relative(CACHE_DIR, fullPath);
 
     return {
       filename: file.name,
       path: path.relative(CACHE_DIR, file.parentPath),
-      data: parsedYaml
+      data: parsedYaml,
+      editOnGithubUrl: getEditOnGithubUrl(relativePath),
     }
   });
 
@@ -178,8 +192,6 @@ function getProcessedFaq(faq) {
   // Normalize status
   const status = faq.data.Status.replace(/^(⚠️|🛑|✅)\s*/, '').replace(" ", "-").trim().toLowerCase();
   const needsRefactoring = (/>\s*\[!WARNING\]\s*\n>\s*.*needs\s+refactoring/).test(faq.content);
-  // Generate edit on github URL
-  const editOnGithubUrl = new URL(`${faq.path}/${faq.filename}`, EDIT_ON_GITHUB_ROOT).href;
 
   // Extract question and answer
   const [question, answer] = splitMarkdownAtFirstH1(faq.content);
@@ -194,7 +206,7 @@ function getProcessedFaq(faq) {
     status,
     needsRefactoring,
     permalink: `/faq/${id}/`,
-    editOnGithubUrl,
+    editOnGithubUrl: faq.editOnGithubUrl,
     relatedIssues: parseRelatedIssues(faq.data["Related issue"] || faq.data["Related issues"]), // Temporarily use both, remove once CRA-HUB source is normalized to Related issues.
     pageTitle: markdownToPlainText(question),
     question,
@@ -240,9 +252,6 @@ function getProcessedGuidanceRequest(guidanceRequest) {
   // Normalize status
   const status = guidanceRequest.data.status.replace(/^(⚠️|🛑|✅)\s*/, '').replace(" ", "-").trim().toLowerCase();
 
-  // Generate edit on github URL
-  const editOnGithubUrl = new URL(`${guidanceRequest.path}/${guidanceRequest.filename}`, EDIT_ON_GITHUB_ROOT).href;
-
   // Extract title and body
   const [title, body] = splitMarkdownAtFirstH1(guidanceRequest.content);
 
@@ -250,7 +259,7 @@ function getProcessedGuidanceRequest(guidanceRequest) {
     id,
     status,
     permalink: `/pending-guidance/${id}/`,
-    editOnGithubUrl,
+    editOnGithubUrl: guidanceRequest.editOnGithubUrl,
     relatedIssue: guidanceRequest.data["Related issue"],
     pageTitle: markdownToPlainText(title),
     title,
@@ -307,7 +316,8 @@ function getProcessedCuratedList(curatedList) {
     icon: values.icon,
     faqs: normalizedFaqRefs,
     permalink: `/faq/${id}/`,
-    description: values.description
+    description: values.description,
+    editOnGithubUrl: curatedList.editOnGithubUrl,
   }
 }
 
@@ -413,7 +423,8 @@ function processAllContent() {
     faqs,
     guidance: guidanceRequests,
     lists,
-    authorsContent
+    authorsContent,
+
   };
 }
 
